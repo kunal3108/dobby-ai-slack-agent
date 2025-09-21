@@ -8,9 +8,10 @@ WORKDIR /app
 COPY slack_listener/ ./slack_listener/
 COPY requirements.txt .
 COPY README.md .
+COPY main.py .   # ✅ Add this so Docker image has main.py
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Run listener
-CMD ["python", "slack_listener/listener.py"]
+# Run main
+CMD ["python", "main.py"]
