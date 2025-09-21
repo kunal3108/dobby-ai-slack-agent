@@ -79,38 +79,42 @@ class SlackListener:
     def _handle_message_event(self, event: Dict[str, Any], say: Callable) -> None:
         """
         Handle incoming Slack message events.
-        
-        Args:
-            event: Slack event data
-            say: Slack response function
         """
+        print("\n📩 Incoming Slack event:")
+        try:
+            print(json.dumps(event, indent=2))
+        except Exception:
+            print(event)
+    
         # Ignore bot messages
         if event.get("subtype") == "bot_message":
+            print("🤖 Ignored a bot_message event")
             return
-        
+    
         # Check if channel is allowed
         channel_id = event.get("channel", "")
         if self.allowed_channels and channel_id not in self.allowed_channels:
+            print(f"⚠ Ignored message from disallowed channel {channel_id}")
             return
-        
+    
         # Check for duplicates
         if self._is_duplicate_event(event):
             print(f"⚠ Duplicate event ignored: {event.get('ts')}")
             return
-        
+    
         print(f"✅ Processing new event {event.get('ts')} with text: {event.get('text')}")
-        
+    
         # Extract message details
         text = event.get("text", "")
         ts = event.get("ts")
         thread_ts = event.get("ts") or event.get("event_ts")
-
-        
+    
         # Check if bot is mentioned
         bot_mention = f"<@{self.bot_user_id}>"
         if bot_mention not in text:
+            print(f"ℹ Bot mention ({bot_mention}) not found in text: {text}")
             return
-        
+    
         # Process the message
         try:
             self._process_user_query(event, say, channel_id, thread_ts)
@@ -118,6 +122,7 @@ class SlackListener:
             error_msg = f"⚠ Error processing message: {str(e)}"
             print(error_msg)
             say(text=error_msg, thread_ts=thread_ts)
+
     
     def _is_duplicate_event(self, event: Dict[str, Any]) -> bool:
         """
@@ -263,6 +268,9 @@ class SlackListener:
             error_msg = f"⚠ Error handling file metadata: {str(e)}"
             print(error_msg)
             say(text=error_msg, thread_ts=event.get("ts") or event.get("event_ts"))
+
+    
+
 
 
 
