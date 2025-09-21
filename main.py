@@ -1,3 +1,4 @@
+from slack_listener.listener import SlackListener
 if __name__ == "__main__":
     # Example configuration
     ALLOWED_CHANNELS = ['C099UK7HF2A']  # Replace with your channel IDs
