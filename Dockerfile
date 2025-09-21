@@ -8,10 +8,13 @@ WORKDIR /app
 COPY slack_listener/ ./slack_listener/
 COPY requirements.txt .
 COPY README.md .
-COPY main.py .   
+COPY main.py .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Ensure Python prints immediately (no buffering)
+ENV PYTHONUNBUFFERED=1
 
 # Run main
 CMD ["python", "main.py"]
