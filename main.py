@@ -1,27 +1,15 @@
-from slack_listener.listener import SlackListener
-import json
-
 if __name__ == "__main__":
-    print("🤖 Donna Slack bot is starting...")
-
-    # Instantiate the listener
-    listener = SlackListener()
-
-    # Wrap the original handler with extra logging
-    original_handler = listener._handle_message_event
-
-    def debug_wrapper(event, say):
-        print("\n📩 Incoming Slack event in main.py:")
-        try:
-            print(json.dumps(event, indent=2))
-        except Exception:
-            print(event)
-
-        # Call the original logic
-        original_handler(event, say)
-
-    # Monkey-patch the handler
-    listener._handle_message_event = debug_wrapper
-
-    # Start the listener
-    listener.start_listening()
+    # Example configuration
+    ALLOWED_CHANNELS = ['C099UK7HF2A']  # Replace with your channel IDs
+    
+    # Create listener with default processor
+    listener = SlackListener(
+        allowed_channels=ALLOWED_CHANNELS,
+        #query_processor=create_default_query_processor()
+    )
+    
+    # Print configuration
+    print("Bot configuration:", listener.get_bot_info())
+    
+    # Start listening
+    listener.start_listening() 
