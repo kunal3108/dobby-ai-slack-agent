@@ -1,37 +1,38 @@
-from state import State
+# nodes/classify.py
+from typing import Dict
 from openai import OpenAI
 
 client = OpenAI()
 
-def classify(state: State) -> State:
+def classify(state: Dict) -> Dict:
+    """
+    Classify the user text into an intent using GPT-4o.
+    """
     text = state["text"]
 
-    allowed_intents = [
-        "create_jira_ticket",
-        "update_jira_ticket",
-        "summarize_thread",
-        "file summary",
-        "publish",
-        "lookup"
-    ]
+    system_prompt = """
+    You are a classifier. 
+    Your job is to assign exactly one intent from this list:
 
-    # Ask GPT-4o to classify
+    - create_jira_ticket → when user asks to create a Jira ticket
+    - update_jira_ticket → when user asks to update an existing Jira ticket
+    - summarize_thread → when user asks for a summary of the messages in a Slack thread
+    - file summary → when user asks for a summary of a file shared in a Slack thread
+    - publish → when user asks to publish data
+    - lookup → when user asks to retrieve a data point
+
+    Always return a JSON: {"intent": "<one_of_the_above>"}.
+    """
+
     response = client.chat.completions.create(
-        model="gpt-4o",  
+        model="gpt-4o-mini",   # cheap + fast
         messages=[
-            {"role": "system", "content": "You are a classifier. Return only one label from the allowed intents."},
-            {"role": "user", "content": f"""
-Classify this message into one of:
-{", ".join(allowed_intents)}
-
-Message: {text}
-            """}
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Text: {text}"}
         ],
-        max_tokens=10,
-        temperature=0
+        response_format={"type": "json_object"}
     )
 
-    intent = response.choices[0].message.content.strip()
-    state["intent"] = intent if intent in allowed_intents else "unknown"
-
+    intent = response.choices[0].message.parsed["intent"]
+    state["intent"] = intent
     return state
