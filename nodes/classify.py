@@ -1,21 +1,37 @@
-# nodes/classify.py
 from state import State
+from openai import OpenAI
+
+client = OpenAI()
 
 def classify(state: State) -> State:
-    text = state["text"].lower()
+    text = state["text"]
 
-    if "create a jira" in text or "create a ticket" in text:
-        state["intent"] = "create_jira_ticket"
-    elif "update an-" in text or "update " in text:
-        state["intent"] = "update_jira_ticket"
-    elif "summarize this thread" in text or "summarize" in text:
-        state["intent"] = "summarize_thread"
-    elif "file summary" in text:
-        state["intent"] = "file summary"
-    elif "publish" in text:
-        state["intent"] = "publish"
-    else:
-        state["intent"] = "lookup"
+    allowed_intents = [
+        "create_jira_ticket",
+        "update_jira_ticket",
+        "summarize_thread",
+        "file summary",
+        "publish",
+        "lookup"
+    ]
+
+    # Ask GPT-4o to classify
+    response = client.chat.completions.create(
+        model="gpt-4o",  
+        messages=[
+            {"role": "system", "content": "You are a classifier. Return only one label from the allowed intents."},
+            {"role": "user", "content": f"""
+Classify this message into one of:
+{", ".join(allowed_intents)}
+
+Message: {text}
+            """}
+        ],
+        max_tokens=10,
+        temperature=0
+    )
+
+    intent = response.choices[0].message.content.strip()
+    state["intent"] = intent if intent in allowed_intents else "unknown"
 
     return state
-
