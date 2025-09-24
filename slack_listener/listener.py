@@ -16,6 +16,7 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from utils.aws_secrets import load_secrets
 from typing import List, Optional, Callable, Set, Dict, Any
+import signal, sys
 
 class SlackListener:
     """
@@ -28,8 +29,11 @@ class SlackListener:
                  publish_handler: Optional[Callable] = None,
                  file_handler: Optional[Callable] = None):
 
-        # Load secrets once
-        secrets = load_secrets()
+        try:
+            secrets = load_secrets()
+        except Exception as e:
+            raise RuntimeError(f"Failed to load secrets from AWS: {e}")
+
 
         # Read directly from secrets dict, not os.getenv
         self.slack_bot_token = secrets.get("SLACK_BOT_TOKEN")
@@ -256,6 +260,16 @@ class SlackListener:
             error_msg = f"⚠ Error handling file metadata: {str(e)}"
             print(error_msg)
             say(text=error_msg, thread_ts=event.get("ts") or event.get("event_ts"))
+
+
+def shutdown_handler(signum, frame):
+    print("🛑 Shutting down SlackListener...")
+    sys.exit(0)
+
+# Attach signals
+signal.signal(signal.SIGINT, shutdown_handler)
+signal.signal(signal.SIGTERM, shutdown_handler)
+
 
     
 
