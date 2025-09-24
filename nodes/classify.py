@@ -25,7 +25,7 @@ def classify(state: Dict) -> Dict:
     """
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",   # cheap + fast
+        model="gpt-4o",   # cheap + fast
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"Text: {text}"}
