@@ -1,8 +1,13 @@
 from typing import Dict
 from openai import OpenAI
-from utils.context_loader import load_channel_context   # new helper
+from utils.context_loader import load_channel_context   
+from utils.secrets_loader import load_secrets
+import os
 
-client = OpenAI()
+# Ensure OpenAI key is loaded
+load_secrets()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 
 def classify(state: Dict, channel_id: str = None) -> Dict:
     """
