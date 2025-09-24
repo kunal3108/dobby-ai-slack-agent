@@ -1,6 +1,8 @@
 # tools/1A_Charts/publish.py
+
 import os
 import pandas as pd
+import boto3
 
 class OneAChartsPublisher:
     def __init__(self, csv_path: str):
@@ -9,37 +11,47 @@ class OneAChartsPublisher:
 
         Args:
             csv_path: Path to the 1A_Charts CSV file
+                      (local path OR s3://bucket/key.csv)
         """
-        self.df = pd.read_csv(csv_path, parse_dates=["Date"], dayfirst=True)
+        storage_opts = {"anon": False} if csv_path.startswith("s3://") else None
+        self.df = pd.read_csv(csv_path, parse_dates=["Date"], dayfirst=True,
+                              storage_options=storage_opts)
         self.df["Date"] = self.df["Date"].dt.date
 
-    def publish_dashboard(self, target_date: str, output_dir: str = "/Users/kunaltalukdar/Downloads"):
+        # Store for re-use (for S3 writes later)
+        self.csv_path = csv_path
+
+    def publish_dashboard(
+        self, target_date: str,
+        output_dir: str = "./",
+        upload_to_s3: bool = True
+    ):
         """
         Generate dashboard summary for a given date and export to Excel.
-        
+
         Args:
             target_date: date string in dd/mm/yy format
-            output_dir: folder where Excel will be saved
+            output_dir: folder where Excel will be saved (temp if S3 used)
+            upload_to_s3: if True and csv_path was S3, uploads result back to S3
 
         Returns:
-            str: path of saved Excel file
+            str: local file path (and S3 URI if uploaded)
         """
         # Parse target date
         date_obj = pd.to_datetime(target_date, format="%d/%m/%y").date()
 
-        # Current and previous month
-        curr_month = date_obj.month
+        # Current + previous month
+        curr_month, year = date_obj.month, date_obj.year
         prev_month = curr_month - 1 if curr_month > 1 else 12
-        year = date_obj.year
         prev_year = year if prev_month != 12 else year - 1
 
-        # Filter current + prev month
-        curr_df = self.df[(self.df["Date"].apply(lambda d: d.month) == curr_month) & 
+        # Filter
+        curr_df = self.df[(self.df["Date"].apply(lambda d: d.month) == curr_month) &
                           (self.df["Date"].apply(lambda d: d.year) == year)]
-        prev_df = self.df[(self.df["Date"].apply(lambda d: d.month) == prev_month) & 
+        prev_df = self.df[(self.df["Date"].apply(lambda d: d.month) == prev_month) &
                           (self.df["Date"].apply(lambda d: d.year) == prev_year)]
 
-        # Last available values for each metric
+        # Last available values
         curr_vals = curr_df.groupby("Metric_Name")["Metric_Value"].last()
         prev_vals = prev_df.groupby("Metric_Name")["Metric_Value"].last()
 
@@ -48,10 +60,9 @@ class OneAChartsPublisher:
             curr_val = curr_vals.get(metric, None)
             prev_val = prev_vals.get(metric, None)
 
+            change = None
             if curr_val and prev_val:
                 change = ((curr_val - prev_val) / prev_val) * 100
-            else:
-                change = None
 
             rows.append({
                 "Particulars": metric,
@@ -62,33 +73,45 @@ class OneAChartsPublisher:
 
         dashboard_df = pd.DataFrame(rows)
 
-        # Ensure output dir exists
+        # Ensure local output dir exists
         os.makedirs(output_dir, exist_ok=True)
-        output_file = os.path.join(output_dir, f"1A_Charts_Dashboard_{date_obj}.xlsx")
+        local_file = os.path.join(output_dir, f"1A_Charts_Dashboard_{date_obj}.xlsx")
 
         # Save to Excel
-        with pd.ExcelWriter(output_file, engine="xlsxwriter") as writer:
+        with pd.ExcelWriter(local_file, engine="xlsxwriter") as writer:
             dashboard_df.to_excel(writer, index=False, sheet_name="Dashboard")
 
-            # Format the sheet
+            # Formatting
             workbook = writer.book
             worksheet = writer.sheets["Dashboard"]
 
-            # Header style
             header_fmt = workbook.add_format({"bold": True, "bg_color": "#DCE6F1", "align": "center"})
             for col_num, value in enumerate(dashboard_df.columns.values):
                 worksheet.write(0, col_num, value, header_fmt)
 
-            # Auto column width
             for i, col in enumerate(dashboard_df.columns):
                 col_width = max(dashboard_df[col].astype(str).map(len).max(), len(col)) + 2
                 worksheet.set_column(i, i, col_width)
 
-        return output_file
+        result = f"✅ Dashboard exported locally: {local_file}"
+
+        # Upload to S3 if requested
+        if upload_to_s3 and self.csv_path.startswith("s3://"):
+            bucket = self.csv_path.split("/")[2]
+            prefix = "/".join(self.csv_path.split("/")[3:-1])
+            s3_key = f"{prefix}/output/1A_Charts/{os.path.basename(local_file)}"
+
+            s3 = boto3.client("s3")
+            s3.upload_file(local_file, bucket, s3_key)
+
+            s3_uri = f"s3://{bucket}/{s3_key}"
+            result += f"\n☁️ Also uploaded to: {s3_uri}"
+
+        return result
 
 
-# Example usage
-if __name__ == "__main__":
-    tool = OneAChartsPublisher("/Users/kunaltalukdar/Downloads/1A_Charts_2025.csv")
-    file_path = tool.publish_dashboard("18/09/25")
-    print(f"✅ Dashboard exported: {file_path}")
+# # Example usage
+# if __name__ == "__main__":
+#     csv_path = "s3://aws-logs-620144979924-ap-south-1/analytics-slack-agent/data/1A_Charts/1A_Charts_2025.csv"
+#     tool = OneAChartsPublisher(csv_path)
+#     print(tool.publish_dashboard("18/09/25"))
