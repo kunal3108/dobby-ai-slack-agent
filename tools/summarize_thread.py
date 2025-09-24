@@ -1,45 +1,38 @@
-# tools/summarize_thread_node.py
-from typing import TypedDict, Dict, Any
+# tools/summarize_thread.py
+from typing import Dict
 from openai import OpenAI
 from utils.secrets_loader import load_secrets
 import os
 
-
-# ---- State Definition ----
-class State(TypedDict, total=False):
-    text: str
-    intent: str
-    result: str
-    channel_id: str
-    thread_ts: str
-
-
-# ---- Load Secrets & Init OpenAI ----
+# Ensure OpenAI key is loaded from AWS Secrets Manager
 try:
     secrets = load_secrets()
 except Exception as e:
     raise RuntimeError(f"Failed to load secrets for OpenAI: {e}")
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=secrets.get("OPENAI_API_KEY"))
 
-
-# ---- LangGraph Node ----
-def summarize_thread_node(state: State, slack_client: Any) -> State:
+def summarize_thread_node(state: Dict) -> Dict:
     """
-    LangGraph node: Summarize a Slack thread using GPT-4o.
+    LangGraph node: Summarize a Slack thread using GPT-4o and return the summary.
 
-    Args:
-        state: Current workflow state (must include channel_id, thread_ts)
-        slack_client: Slack WebClient (passed from listener)
+    Expects state to include:
+        - channel_id: Slack channel ID
+        - thread_ts: parent thread timestamp
+        - slack_client: Slack WebClient (from slack_bolt.App.client)
 
-    Returns:
-        Updated state with summary in state["result"]
+    Updates:
+        - state["result"]: summary text
     """
-
     channel_id = state.get("channel_id")
     thread_ts = state.get("thread_ts")
+    slack_client = state.get("slack_client")
 
-    # 1. Fetch messages in the thread
+    if not channel_id or not thread_ts or not slack_client:
+        state["result"] = "⚠️ Missing Slack context (channel_id/thread_ts/slack_client)."
+        return state
+
+    # 1. Get all messages in the thread
     replies = slack_client.conversations_replies(
         channel=channel_id,
         ts=thread_ts
@@ -53,7 +46,7 @@ def summarize_thread_node(state: State, slack_client: Any) -> State:
         state["result"] = summary
         return state
 
-    # 2. Ask GPT-4o for summary
+    # 2. Ask GPT-4o for a summary
     system_prompt = """
     You are a helpful assistant. Summarize the following Slack thread clearly and concisely.
     Highlight main points, decisions, and action items if any.
