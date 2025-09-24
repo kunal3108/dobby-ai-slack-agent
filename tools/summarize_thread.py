@@ -1,8 +1,13 @@
 # tools/summarize_thread.py
 from typing import Dict
 from openai import OpenAI
+from utils.secrets_loader import load_secrets
+import os
 
-client = OpenAI()
+# Ensure OpenAI key is loaded
+load_secrets()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 
 def summarize_thread(state: Dict, slack_client, channel_id: str, thread_ts: str) -> Dict:
     """
