@@ -1,13 +1,13 @@
 # graph/workflow.py
-from typing import Dict
+from typing import Dict, Any
 from langgraph.graph import StateGraph, END
 from nodes.classify_node import classify_node
 from tools.summarize_thread import summarize_thread_node
 from tools.lookup import lookup_node
 from tools.publish import publish_node
 
-# Shared state schema (could later use TypedDict for stronger typing)
-State = Dict[str, str]
+# Shared state schema
+State = Dict[str, Any]
 
 def route_based_on_intent(state: State) -> str:
     """Decide next node based on classified intent."""
@@ -19,7 +19,9 @@ def route_based_on_intent(state: State) -> str:
     elif intent == "publish":
         return "publish"
     else:
-        return END   # fallback to END
+        # Add a fallback response
+        state["result"] = f"⚠️ Unknown intent: {intent}"
+        return END
 
 def build_graph():
     graph = StateGraph(State)
