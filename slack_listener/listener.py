@@ -12,53 +12,45 @@ import sys
 import json
 import time
 from datetime import datetime
-from typing import Dict, List, Set, Optional, Callable, Any
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
-from utils.secrets_loader import load_secrets
-
+from utils.aws_secrets import load_secrets
+from typing import List, Optional, Callable, Set, Dict, Any
 
 class SlackListener:
     """
     Slack message listener and processor for Donna RAG Assistant.
-    
-    Handles Slack events, processes user queries, and manages bot responses
-    for both data lookup and dataset publishing operations.
     """
-    
+
     def __init__(self, 
-                 allowed_channels: Optional[List[str]] = None,
+                 allowed_channels: Optional[list[str]] = None,
                  query_processor: Optional[Callable] = None,
                  publish_handler: Optional[Callable] = None,
                  file_handler: Optional[Callable] = None):
-        """
-        Initialize the Slack listener.
-        
-        Args:
-            allowed_channels: List of channel IDs where bot should respond
-            query_processor: Function to process lookup queries
-            publish_handler: Function to handle publish requests
-        """
+
+        # Load secrets once
         secrets = load_secrets()
 
-        self.slack_bot_token = os.getenv("SLACK_BOT_TOKEN")
-        self.slack_app_token = os.getenv("SLACK_APP_TOKEN")
-        self.bot_user_id = os.getenv("BOT_USER_ID")
+        # Read directly from secrets dict, not os.getenv
+        self.slack_bot_token = secrets.get("SLACK_BOT_TOKEN")
+        self.slack_app_token = secrets.get("SLACK_APP_TOKEN")
+        self.bot_user_id = secrets.get("BOT_USER_ID")
 
         if not all([self.slack_bot_token, self.slack_app_token, self.bot_user_id]):
-            raise ValueError("Missing Slack credentials")
+            raise ValueError("Missing Slack credentials from AWS Secrets Manager")
 
+        # Initialize Slack app
         self.app = App(token=self.slack_bot_token)
-        
-        # Configuration
+
+        # Config
         self.allowed_channels = allowed_channels or []
         self.query_processor = query_processor
         self.publish_handler = publish_handler
         self.file_handler = file_handler
-        
+
         # Deduplication tracking
         self.seen_events: Set[tuple] = set()
-        
+
         # Register event handlers
         self._register_handlers()
         
