@@ -1,12 +1,12 @@
 # graph/workflow.py
 from typing import Dict
-from langgraph.graph import StateGraph
-from nodes.classify import classify
-from tools.summarize_thread import summarize_thread
-from tools.lookup import lookup_tool
-from tools.publish import publish_tool
+from langgraph.graph import StateGraph, END
+from nodes.classify_node import classify_node
+from tools.summarize_thread import summarize_thread_node
+from tools.lookup import lookup_node
+from tools.publish import publish_node
 
-# Shared state schema
+# Shared state schema (could later use TypedDict for stronger typing)
 State = Dict[str, str]
 
 def route_based_on_intent(state: State) -> str:
@@ -19,16 +19,16 @@ def route_based_on_intent(state: State) -> str:
     elif intent == "publish":
         return "publish"
     else:
-        return "end"   # fallback
+        return END   # fallback to END
 
 def build_graph():
     graph = StateGraph(State)
 
     # Add nodes
-    graph.add_node("classify", classify)
-    graph.add_node("summarize_thread", summarize_thread)
-    graph.add_node("lookup", lookup_tool)
-    graph.add_node("publish", publish_tool)
+    graph.add_node("classify", classify_node)
+    graph.add_node("summarize_thread", summarize_thread_node)
+    graph.add_node("lookup", lookup_node)
+    graph.add_node("publish", publish_node)
 
     # Entry point
     graph.set_entry_point("classify")
@@ -37,8 +37,8 @@ def build_graph():
     graph.add_conditional_edges("classify", route_based_on_intent)
 
     # End nodes
-    graph.set_finish_point("summarize_thread")
-    graph.set_finish_point("lookup")
-    graph.set_finish_point("publish")
+    graph.add_edge("summarize_thread", END)
+    graph.add_edge("lookup", END)
+    graph.add_edge("publish", END)
 
     return graph.compile()
