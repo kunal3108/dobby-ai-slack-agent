@@ -1,0 +1,56 @@
+# ---- Environment & Secrets ----
+.env
+*.env
+!*.env.example   # allow example env files
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+*.spec
+
+# ---- Virtual Environments ----
+.env/
+.venv/
+venv/
+ENV/
+env/
+.conda/
+.mypy_cache/
+.pytest_cache/
+.dmypy.json
+.dmypy.json
+
+# ---- Logs & Debug ----
+*.log
+*.out
+*.err
+
+# ---- Jupyter Notebooks ----
+.ipynb_checkpoints
+*.ipynb_convert
+
+# ---- IDEs & Editors ----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---- Docker ----
+*.pid
+*.seed
+*.pid.lock
+*.pidfile
+*.lock
+docker-compose.override.yml
+
+# ---- OS Files ----
+.DS_Store
+Thumbs.db
