@@ -39,19 +39,15 @@ class SlackListener:
             query_processor: Function to process lookup queries
             publish_handler: Function to handle publish requests
         """
-        # Load environment variables
-        load_dotenv()
-        
-        # Slack configuration
+        secrets = load_secrets()
+
         self.slack_bot_token = os.getenv("SLACK_BOT_TOKEN")
-        self.slack_app_token = os.getenv("SLACK_APP_TOKEN") 
+        self.slack_app_token = os.getenv("SLACK_APP_TOKEN")
         self.bot_user_id = os.getenv("BOT_USER_ID")
-        
-        # Validate required tokens
+
         if not all([self.slack_bot_token, self.slack_app_token, self.bot_user_id]):
-            raise ValueError("Missing required Slack environment variables: SLACK_BOT_TOKEN, SLACK_APP_TOKEN, BOT_USER_ID")
-        
-        # Initialize Slack app
+            raise ValueError("Missing Slack credentials")
+
         self.app = App(token=self.slack_bot_token)
         
         # Configuration
