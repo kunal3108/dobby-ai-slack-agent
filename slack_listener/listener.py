@@ -13,9 +13,9 @@ import json
 import time
 from datetime import datetime
 from typing import Dict, List, Set, Optional, Callable, Any
-from dotenv import load_dotenv
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
+from utils.secrets_loader import load_secrets
 
 
 class SlackListener:
