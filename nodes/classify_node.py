@@ -1,7 +1,9 @@
+# nodes/classify_node.py
 from typing import Dict
 from openai import OpenAI
 from utils.context_loader import load_channel_context
 from utils.secrets_loader import load_secrets
+from state import State  # your TypedDict for state
 
 # Ensure OpenAI key is loaded from AWS Secrets Manager
 try:
@@ -11,14 +13,13 @@ except Exception as e:
 
 client = OpenAI(api_key=secrets.get("OPENAI_API_KEY"))
 
-
-def classify(state: Dict, channel_id: str = None) -> Dict:
+def classify_node(state: State) -> State:
     """
-    Classify the user text into an intent using GPT-4o,
+    LangGraph node: classify user text into an intent using GPT-4o,
     enriched with channel-specific context.
     """
     text = state["text"]
-    channel_context = load_channel_context(channel_id) if channel_id else ""
+    channel_context = load_channel_context(state.get("channel_id", ""))
 
     system_prompt = f"""
     You are a classifier. 
