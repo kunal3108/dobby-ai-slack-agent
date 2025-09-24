@@ -1,16 +1,18 @@
-# nodes/classify.py
 from typing import Dict
 from openai import OpenAI
+from utils.context_loader import load_channel_context   # new helper
 
 client = OpenAI()
 
-def classify(state: Dict) -> Dict:
+def classify(state: Dict, channel_id: str = None) -> Dict:
     """
-    Classify the user text into an intent using GPT-4o.
+    Classify the user text into an intent using GPT-4o,
+    enriched with channel-specific context.
     """
     text = state["text"]
+    channel_context = load_channel_context(channel_id) if channel_id else ""
 
-    system_prompt = """
+    system_prompt = f"""
     You are a classifier. 
     Your job is to assign exactly one intent from this list:
 
@@ -21,11 +23,14 @@ def classify(state: Dict) -> Dict:
     - publish → when user asks to publish data
     - lookup → when user asks to retrieve a data point
 
-    Always return a JSON: {"intent": "<one_of_the_above>"}.
+    Channel Context (may affect classification):
+    {channel_context}
+
+    Always return a JSON: {{"intent": "<one_of_the_above>"}}.
     """
 
     response = client.chat.completions.create(
-        model="gpt-4o",   # cheap + fast
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"Text: {text}"}
