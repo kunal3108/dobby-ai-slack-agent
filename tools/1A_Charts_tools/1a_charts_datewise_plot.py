@@ -1,14 +1,20 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import boto3
 
 class OneAChartsLookup:
     def __init__(self, csv_path: str):
         """
         Initialize lookup tool for 1A_Charts.
         """
-        # Load CSV with proper date parsing
-        self.df = pd.read_csv(csv_path, parse_dates=["Date"], dayfirst=True)
+        # Load CSV directly from S3 or local path
+        self.df = pd.read_csv(
+            csv_path,
+            parse_dates=["Date"],
+            dayfirst=True,
+            storage_options={"anon": False} if csv_path.startswith("s3://") else None
+        )
 
         # Keep only the date (not time)
         self.df["Date"] = self.df["Date"].dt.date
@@ -33,9 +39,11 @@ class OneAChartsLookup:
                 results[d] = f"Error: {e}"
         return results
 
-    def plot_metric(self, metric_name: str, dates: list[str], output_dir: str = "/Users/kunaltalukdar/Downloads"):
+    def plot_metric(self, metric_name: str, dates: list[str], 
+                    output_dir: str = "./", 
+                    upload_to_s3: bool = True):
         """
-        Plot line chart for given metric over specified dates and save to Downloads.
+        Plot line chart for given metric over specified dates and upload to S3.
         """
         results = self.get_metric(metric_name, dates)
 
@@ -64,17 +72,20 @@ class OneAChartsLookup:
         # Show only dates on x-axis
         plt.xticks(plot_df["Date"], [d.strftime("%d/%m/%y") for d in plot_df["Date"]])
 
-        # Ensure directory exists
+        # Save locally first
         os.makedirs(output_dir, exist_ok=True)
         output_file = os.path.join(output_dir, f"{metric_name.replace(' ', '_')}_chart.png")
-
         plt.savefig(output_file)
         plt.close()
 
-        return f"Chart saved to {output_file}"
+        print(f"📊 Chart saved locally at {output_file}")
 
-#tool = OneAChartsLookup("/Users/kunaltalukdar/Downloads/1A_Charts_2025.csv")
+        # Upload to S3 if enabled
+        if upload_to_s3:
+            s3 = boto3.client("s3")
+            bucket = "aws-logs-620144979924-ap-south-1"
+            key = "analytics-slack-agent/output/1A_Charts/" + os.path.basename(output_file)
+            s3.upload_file(output_file, bucket, key)
+            print(f"✅ Chart uploaded to s3://{bucket}/{key}")
 
-#print(tool.plot_metric("Total Activated", ["01/07/25","02/07/25","03/07/25","04/07/25","05/07/25"]))
-
-
+        return output_file
