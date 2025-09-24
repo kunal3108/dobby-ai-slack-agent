@@ -2,33 +2,21 @@
 from typing import Dict
 from openai import OpenAI
 from utils.secrets_loader import load_secrets
-import os
 
-# Ensure OpenAI key is loaded
-load_secrets()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Ensure OpenAI key is loaded from AWS Secrets Manager
+try:
+    secrets = load_secrets()
+    client = OpenAI(api_key=secrets.get("OPENAI_API_KEY"))
+except Exception as e:
+    raise RuntimeError(f"Failed to load secrets for OpenAI: {e}")
 
 
 def summarize_thread(state: Dict, slack_client, channel_id: str, thread_ts: str) -> Dict:
     """
     Summarize a Slack thread using GPT-4o and post the summary back to Slack.
-
-    Args:
-        state: dictionary holding workflow state
-        slack_client: Slack WebClient (from slack_bolt.App.client)
-        channel_id: Slack channel ID
-        thread_ts: parent thread timestamp
-
-    Returns:
-        Updated state with summary text in state["result"]
     """
-
     # 1. Get all messages in the thread
-    replies = slack_client.conversations_replies(
-        channel=channel_id,
-        ts=thread_ts
-    )
-
+    replies = slack_client.conversations_replies(channel=channel_id, ts=thread_ts)
     messages = [m.get("text", "") for m in replies.get("messages", []) if "text" in m]
 
     if not messages:
@@ -42,7 +30,6 @@ def summarize_thread(state: Dict, slack_client, channel_id: str, thread_ts: str)
     You are a helpful assistant. Summarize the following Slack thread clearly and concisely.
     Highlight main points, decisions, and action items if any.
     """
-
     user_content = "\n".join([f"- {m}" for m in messages])
 
     response = client.chat.completions.create(
@@ -65,4 +52,3 @@ def summarize_thread(state: Dict, slack_client, channel_id: str, thread_ts: str)
     # 4. Update state
     state["result"] = summary
     return state
-
