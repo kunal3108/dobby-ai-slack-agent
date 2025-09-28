@@ -1,9 +1,10 @@
 # state.py
-from typing import TypedDict
+from typing import TypedDict, Optional, Dict
 
 class State(TypedDict, total=False):
-    text: str       # user query
-    intent: str     # classifier output
-    result: str     # tool output
+    text: str
+    intent: str
+    response: Optional[str]
+    file_metadata: Optional[Dict]
     channel_id: str
     thread_ts: str
