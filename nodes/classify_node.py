@@ -1,60 +1,61 @@
 # nodes/classify_node.py
-from typing import Dict
+from typing import Dict, Any
+from langgraph.graph import node
 from openai import OpenAI
 from utils.context_loader import load_channel_context
 from utils.secrets_loader import load_secrets
-import os
 
-# Load OpenAI key once
-secrets = load_secrets()
+# Load OpenAI API key once
+try:
+    secrets = load_secrets()
+except Exception as e:
+    raise RuntimeError(f"Failed to load secrets for OpenAI: {e}")
+
 client = OpenAI(api_key=secrets.get("OPENAI_API_KEY"))
 
-def classify_node(state: Dict, channel_id: str = None) -> Dict:
+@node
+def classify_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
-    LangGraph node: classify user query and extract tool-specific variables.
+    LangGraph node: classify the user text into an intent using GPT-4o,
+    optionally enriched with channel-specific context.
+    
+    Input:
+        state["text"] - user message text
+        state["channel_id"] (optional) - Slack channel for context
+    
+    Output:
+        state["intent"] - chosen intent
     """
-    text = state["text"]
+    text = state.get("text", "")
+    channel_id = state.get("channel_id")
     channel_context = load_channel_context(channel_id) if channel_id else ""
 
     system_prompt = f"""
-    You are a classifier and information extractor.
-    - First, classify the user intent into one of:
-      [create_jira_ticket, update_jira_ticket, summarize_thread,
-       file summary, publish, lookup, plot]
-    - Then, if intent is related to 1A_Charts:
-        * lookup → extract 'metric_name' and 'dates'
-        * plot   → extract 'metric_name' and 'dates'
-        * publish → extract 'target_date'
-    - Dates must be in dd/mm/yy format.
-    - If information is missing, set value to null.
+    You are a classifier. 
+    Your job is to assign exactly one intent from this list:
+
+    - create_jira_ticket → when user asks to create a Jira ticket
+    - update_jira_ticket → when user asks to update an existing Jira ticket
+    - summarize_thread → when user asks for a summary of the messages in a Slack thread
+    - file summary → when user asks for a summary of a file shared in a Slack thread
+    - publish → when user asks to publish data
+    - lookup → when user asks to retrieve a data point
 
     Channel Context (may affect classification):
     {channel_context}
 
-    Respond only in JSON:
-    {{
-      "intent": "<one_of_above>",
-      "metric_name": "<str_or_null>",
-      "dates": ["dd/mm/yy", ...] or null,
-      "target_date": "<dd/mm/yy_or_null>"
-    }}
+    Always return a JSON: {{"intent": "<one_of_the_above>"}}.
     """
 
     response = client.chat.completions.create(
-        model="gpt-4o",  # cheaper, faster
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": text}
+            {"role": "user", "content": f"Text: {text}"}
         ],
         response_format={"type": "json_object"}
     )
 
-    parsed = response.choices[0].message.parsed
-
-    # Update state
-    state["intent"] = parsed.get("intent")
-    state["metric_name"] = parsed.get("metric_name")
-    state["dates"] = parsed.get("dates")
-    state["target_date"] = parsed.get("target_date")
-
+    intent = response.choices[0].message.parsed["intent"]
+    state["intent"] = intent
     return state
